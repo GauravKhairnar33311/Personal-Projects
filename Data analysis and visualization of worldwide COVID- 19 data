@@ -1,0 +1,137 @@
+
+-- 1) Selecting dataset for project
+
+SELECT location, date, total_cases, new_cases, total_deaths, population
+FROM dbo.COVIDdeaths
+WHERE continent IS NOT NULL
+ORDER BY 1,2
+
+
+-- 2) Finding out total cases vs total deaths
+
+SELECT location, date, total_cases, total_deaths, ROUND((total_deaths/ total_cases) * 100,2) AS Deathpercentage
+FROM dbo.COVIDdeaths
+WHERE continent IS NOT NULL
+ORDER BY 1,2
+
+
+-- 3) Finding out total cases Vs total deaths for India (What was total percentage of death by COVID 19 in India?
+
+SELECT location, date, total_cases,total_deaths,ROUND((total_deaths/ total_cases) * 100,4) AS Deathpercentage
+FROM dbo.COVIDdeaths
+WHERE location = 'India'
+ORDER BY 1,2
+
+
+--4) Finding total cases Vs population (What percentage of population was infected by COVID 19 in India?)
+
+SELECT location, date, total_cases,population,ROUND((total_cases/ population) * 100,4) AS PercentPopulationInfected
+FROM dbo.COVIDdeaths
+WHERE location = 'India'
+ORDER BY 1,2
+
+
+--5) Which counties have highest infection rate comapared with total population?
+
+SELECT location, population, MAX(total_cases) ,MAX(ROUND((total_cases/ population) * 100,4)) AS PercentPopulationInfected
+FROM dbo.COVIDdeaths
+WHERE continent IS NOT NULL
+GROUP BY location, population
+ORDER BY PercentPopulationInfected DESC
+
+
+--6) Which counties have highest death count comapared with total population?
+
+SELECT location, MAX(CAST(total_deaths AS INT)) AS TotalDeathCount
+FROM dbo.COVIDdeaths
+WHERE continent IS NOT NULL
+GROUP BY location
+ORDER BY TotalDeathCount DESC
+
+
+--7) Which continent has highest death count comapared with total population?
+
+SELECT location, MAX(CAST(total_deaths AS INT)) AS TotalDeathCount
+FROM dbo.COVIDdeaths
+WHERE continent IS NULL
+GROUP BY location
+ORDER BY TotalDeathCount DESC
+
+
+
+-- 8) What are the global numbers?
+
+SELECT SUM( new_cases) AS TotalCases, SUM( CAST(new_deaths AS INT)) AS TotalDeaths, SUM( CAST(new_deaths AS INT))/ SUM( new_cases) * 100 AS PercentDeaths
+FROM dbo.COVIDdeaths
+WHERE continent IS NOT NULL
+ORDER BY 1,2
+
+
+
+-- 9) What is total number of vaccination for total population?
+
+SELECT DISTINCT dea.continent,dea.location,vac.date, dea.population, vac.new_vaccinations
+FROM dbo.COVIDdeaths dea
+JOIN dbo.COVIDvaccinations vac
+ON dea.location = vac. location
+AND dea. date = vac. date
+WHERE dea.continent IS NOT NULL
+ORDER BY 2,3
+
+
+-- 10)  What is total number of vaccination for total population? (Use Window function)
+
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(int,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RollingPeopleVaccinated
+FROM COVIDProject..COVIDdeaths dea
+JOIN COVIDProject..COVIDvaccinations vac
+	On dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent is not null
+ORDER BY 2,3
+
+
+
+-- 11)  Find out percentage of population who got vaccinated. (Use CTE)
+
+WITH PopvsVac (continent, location, date, population, new_vaccinations, RollingPeopleVaccinated)
+AS
+(
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(int,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RollingPeopleVaccinated
+FROM COVIDProject..Coviddeaths dea
+JOIN COVIDProject..Covidvaccinations vac
+	On dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent is not null 
+)
+SELECT *, (RollingPeopleVaccinated/population)*100 AS PercentPopulationVaccinated
+FROM PopvsVac
+
+
+
+-- 12) Find out percentage of population who got vaccinated. (Use TEMP Table)
+
+
+DROP TABLE IF EXISTS #PercentPopulationVaccinated
+CREATE TABLE #PercentPopulationVaccinated
+(
+Continent nvarchar(255),
+location nvarchar(255),
+date datetime,
+population numeric,
+new_vaccinations numeric,
+RollingPeopleVaccinated numeric
+)
+
+INSERT INTO #PercentPopulationVaccinated
+SELECT dea.continent, dea.location, dea.date, dea.population, vac.new_vaccinations
+, SUM(CONVERT(int,vac.new_vaccinations)) OVER (Partition by dea.Location Order by dea.location, dea.Date) as RollingPeopleVaccinated
+FROM COVIDProject..Coviddeaths dea
+JOIN COVIDProject..Covidvaccinations vac
+	On dea.location = vac.location
+	AND dea.date = vac.date
+WHERE dea.continent is not null 
+
+SELECT *, (RollingPeopleVaccinated/population)*100 AS PercentPopulationVaccinated
+FROM #PercentPopulationVaccinated
