@@ -1,5 +1,5 @@
 
--- 1) Selecting dataset for project
+-- 1) Checking dataset for project
 
 SELECT location, date, total_cases, new_cases, total_deaths, population
 FROM dbo.COVIDdeaths
